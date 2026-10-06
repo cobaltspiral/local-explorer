@@ -12,7 +12,6 @@ SERPAPI_URL = "https://serpapi.com/search.json"
 MAX_EVENTS = 5
 
 # A tiny in-memory cache: remembers answers while the server is running.
-# It is NOT a database. Everything vanishes when the server restarts.
 _cache: dict = {}
 
 
@@ -46,7 +45,6 @@ def _serpapi_events(city: str, mood: str, when: str) -> list:
             return []
         raise RuntimeError(data["error"])
 
-    # 1) Structured events, if Google showed an events panel
     events = []
     for ev in data.get("events_results", [])[:MAX_EVENTS]:
         events.append({
@@ -62,7 +60,6 @@ def _serpapi_events(city: str, mood: str, when: str) -> list:
     if events:
         return events
 
-    # 2) Otherwise, normal web results (listing pages)
     listings = []
     for r in data.get("organic_results", [])[:MAX_EVENTS]:
         listings.append({
@@ -87,7 +84,7 @@ def _ddgs_fallback(city: str, mood: str) -> list:
     return [
         {
             "title": r.get("title"),
-            "date": None,  # web snippets don't give a clean date
+            "date": None,
             "venue": None,
             "address": None,
             "link": r.get("href"),
@@ -123,12 +120,12 @@ def find_events(city: str, mood: str, when: str = "week") -> list:
             print(f"  (ddgs problem: {e!r})")
             events = []
 
-    if events:  # only cache real answers
+    if events:
         _cache[cache_key] = events
     return events
 
 
-# ---------- Quick test: run with `python search.py` ----------
+# ---------- Test ----------
 
 if __name__ == "__main__":
     for attempt in (1, 2):
