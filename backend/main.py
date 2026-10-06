@@ -9,7 +9,7 @@ from geo import geocode, find_places
 from search import find_events
 from llm import recommend
 
-app = FastAPI(title="Touch Grass API")
+app = FastAPI(title="Mochi the Explorer API")
 
 # CORS: lets your React app (a different address) call this API.
 # On Render you'll add your frontend's URL to ALLOWED_ORIGINS.
@@ -23,7 +23,7 @@ app.add_middleware(
 
 
 class Answers(BaseModel):
-    """The four questions Pip asks. Anything else is rejected automatically."""
+    """The four questions Mochi asks. Anything else is rejected automatically."""
     location: str = Field(min_length=2, max_length=100)
     mood: Literal["cosy", "outdoors", "adventurous", "creative", "social",
                   "food", "history", "thrifting", "unusual", "surprise"]
