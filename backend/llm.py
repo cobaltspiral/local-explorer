@@ -12,8 +12,9 @@ from moods import DURATIONS
 load_dotenv()
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "gemma4:e4b")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemma4:e2b")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "ollama")
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", 120))
 
 TIME_HINTS = {
     "morning": "morning (before midday)",
@@ -23,14 +24,15 @@ TIME_HINTS = {
     "anytime": "any time of day",
 }
 
-SYSTEM_PROMPT = """You are Pip, a cheerful pixel-art travel guide who loves getting people outside.
+SYSTEM_PROMPT = """You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
 You recommend things using ONLY the numbered lists you are given.
 Rules:
 - Refer to places and events ONLY by their ID (like P3 or E2). Never invent an ID, a place or an event.
 - Items marked [EVENT] are specific events. Items marked [WEB PAGE] are just pages listing what's on: never pretend a web page is a specific event, say it is a page worth checking.
 - Choose places that suit the mood, the time of day and the time available. For evening or night, prefer bars, restaurants and lively places. For morning, prefer parks, cafes and markets.
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
-- "intro" is two short sentences in Pip's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing.
+- "intro" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing.
+- Never write IDs like P1 or E2 inside "intro", "why" or "tip". Use the place's name instead.
 - Reply with JSON only, in exactly this shape:
 {"intro": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}], "event": {"id": "E1", "why": "..."} or null}"""
 
@@ -82,9 +84,11 @@ def call_llm(messages: list) -> str:
             "model": LLM_MODEL,
             "messages": messages,
             "temperature": 0.4,
+            "max_tokens": 700,
             "response_format": {"type": "json_object"},
+            "reasoning_effort": "none",
         },
-        timeout=180,
+        timeout=LLM_TIMEOUT,
     )
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
@@ -99,10 +103,18 @@ def parse_json(text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
+def clean_text(text: str, names: dict) -> str:
+    """Replace any leaked IDs (P1, E2...) with the real name."""
+    return re.sub(r"\b[PE]\d+\b",
+                  lambda m: names.get(m.group(0).upper(), "this spot"), text)
+
+
 def validate(data: dict, places: list, events: list, n_stops: int) -> dict:
     """Turn Gemma's IDs back into REAL data. Anything it invented is dropped."""
     place_by_id = {f"P{i}": p for i, p in enumerate(places, 1)}
     event_by_id = {f"E{i}": e for i, e in enumerate(events, 1)}
+    names = {k: p["name"] for k, p in place_by_id.items()}
+    names.update({k: e["title"] for k, e in event_by_id.items()})
 
     stops, seen = [], set()
     for s in data.get("stops", []):
@@ -116,8 +128,8 @@ def validate(data: dict, places: list, events: list, n_stops: int) -> dict:
                 "lat": p["lat"],
                 "lon": p["lon"],
                 "distance_m": p["distance_m"],
-                "why": str(s.get("why", "")).strip(),
-                "tip": str(s.get("tip", "")).strip(),
+                "why": clean_text(str(s.get("why", "")).strip(), names),
+                "tip": clean_text(str(s.get("tip", "")).strip(), names),
             })
     stops = stops[:n_stops]
     if not stops:
@@ -135,10 +147,10 @@ def validate(data: dict, places: list, events: list, n_stops: int) -> dict:
                 "venue": e.get("venue"),
                 "link": e.get("link"),
                 "type": e.get("type"),
-                "why": str(ev.get("why", "")).strip(),
+                "why": clean_text(str(ev.get("why", "")).strip(), names),
             }
 
-    intro = str(data.get("intro", "")).strip() or "Hi, I'm Pip! I found something fun for you."
+    intro = clean_text(str(data.get("intro", "")).strip(), names) or "Hi, I'm Mochi! I found something fun for you."
     return {"intro": intro, "stops": stops, "event": event, "fallback": False}
 
 
@@ -157,7 +169,7 @@ def fallback_result(places: list, events: list, n_stops: int) -> dict:
                  "link": e.get("link"), "type": e.get("type"), "why": ""}
 
     return {
-        "intro": "Pip's brain is napping, so here are the best spots I could find. Now go outside!",
+        "intro": "Mochi's brain is napping, so here are the best spots I could find. Now go outside!",
         "stops": stops, "event": event, "fallback": True,
     }
 
