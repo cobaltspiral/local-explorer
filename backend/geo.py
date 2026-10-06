@@ -69,6 +69,7 @@ def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
     body = "\n  ".join(parts)
     return f"[out:json][timeout:20];\n(\n  {body}\n);\nout center tags 100;"
 
+
 def run_overpass(query: str) -> list:
     """Sends the query, trying each server and retrying with a pause if busy."""
     last_error = None
@@ -88,6 +89,7 @@ def run_overpass(query: str) -> list:
         time.sleep(wait)
     raise RuntimeError(f"All Overpass servers failed. Last error: {last_error}")
 
+
 def distance_m(lat1, lon1, lat2, lon2) -> float:
     """Straight-line distance in metres between two points (haversine formula)."""
     r = 6371000
@@ -96,6 +98,7 @@ def distance_m(lat1, lon1, lat2, lon2) -> float:
     dl = math.radians(lon2 - lon1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
+
 
 def parse_elements(elements: list, lat: float, lon: float) -> list:
     """Turns raw Overpass results into clean, deduplicated place dicts."""
@@ -141,13 +144,23 @@ def parse_elements(elements: list, lat: float, lon: float) -> list:
         unique.append(p)
     return unique
 
+
 def _search(lat, lon, tags, radius_m):
     query = build_query(lat, lon, tags, radius_m)
     return parse_elements(run_overpass(query), lat, lon)
 
+
+_places_cache: dict = {}
+
 def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
     """Main function: find up to 20 candidate places for this mood and duration."""
     mood = pick_mood(mood)
+
+    cache_key = (round(lat, 2), round(lon, 2), mood, duration)
+    if cache_key in _places_cache:
+        print("  (places: cache hit)")
+        return _places_cache[cache_key]
+
     radius = DURATIONS[duration]["radius_m"]
     tags = MOOD_TAGS[mood]
 
@@ -158,7 +171,10 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
         radius *= 2
         places = _search(lat, lon, tags, radius)
 
-    return {"mood_used": mood, "radius_m": radius, "places": places[:20]}
+    result = {"mood_used": mood, "radius_m": radius, "places": places[:20]}
+    if places:  # only cache real answers
+        _places_cache[cache_key] = result
+    return result
 
 
 if __name__ == "__main__":
