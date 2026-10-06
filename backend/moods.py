@@ -16,8 +16,7 @@ MOOD_TAGS = {
         ("sport", "climbing"), ("waterway", "waterfall"),
     ],
     "creative": [
-        ("tourism", "gallery"), ("tourism", "artwork"),
-        ("amenity", "arts_centre"),
+        ("tourism", "gallery"), ("amenity", "arts_centre"),
     ],
     "social": [
         ("amenity", "pub"), ("amenity", "bar"),
@@ -38,7 +37,7 @@ MOOD_TAGS = {
     ],
     "unusual": [
         ("tourism", "attraction"), ("historic", "ruins"),
-        ("man_made", "lighthouse"), ("tourism", "artwork"),
+        ("man_made", "lighthouse"),
     ],
 }
 
