@@ -169,7 +169,7 @@ def fallback_result(places: list, events: list, n_stops: int) -> dict:
                  "link": e.get("link"), "type": e.get("type"), "why": ""}
 
     return {
-        "intro": "Mochi's brain is napping, so here are the best spots I could find. Now go outside!",
+        "intro": "Mochi's brain is melting, so here are the best spots I could find. Now go outside!",
         "stops": stops, "event": event, "fallback": True,
     }
 
