@@ -14,6 +14,14 @@ MAX_EVENTS = 5
 # A tiny in-memory cache: remembers answers while the server is running.
 _cache: dict = {}
 
+def _text(value, key):
+    """SerpApi sometimes sends a dict ({"name": "..."}) and sometimes plain text."""
+    if isinstance(value, dict):
+        return value.get(key)
+    if isinstance(value, str):
+        return value
+    return None
+
 
 def _serpapi_events(city: str, mood: str, when: str) -> list:
     """Ask SerpApi (Google search). Prefer structured events, else web results."""
@@ -47,11 +55,16 @@ def _serpapi_events(city: str, mood: str, when: str) -> list:
 
     events = []
     for ev in data.get("events_results", [])[:MAX_EVENTS]:
+        if not isinstance(ev, dict):
+            continue
+        address = ev.get("address")
+        if isinstance(address, list):
+            address = ", ".join(str(a) for a in address)
         events.append({
             "title": ev.get("title"),
-            "date": (ev.get("date") or {}).get("when"),
-            "venue": (ev.get("venue") or {}).get("name"),
-            "address": ", ".join(ev.get("address") or []),
+            "date": _text(ev.get("date"), "when"),
+            "venue": _text(ev.get("venue"), "name"),
+            "address": address if isinstance(address, str) else None,
             "link": ev.get("link"),
             "description": ev.get("description"),
             "source": "serpapi",
@@ -62,6 +75,8 @@ def _serpapi_events(city: str, mood: str, when: str) -> list:
 
     listings = []
     for r in data.get("organic_results", [])[:MAX_EVENTS]:
+        if not isinstance(r, dict):
+            continue
         listings.append({
             "title": r.get("title"),
             "date": None,
@@ -98,6 +113,8 @@ def _ddgs_fallback(city: str, mood: str) -> list:
 
 def find_events(city: str, mood: str, when: str = "week") -> list:
     """Main function. Returns a list of events (possibly empty). Never crashes."""
+    if os.getenv("EVENTS_PROVIDER", "on") == "off":
+        return []
     mood = pick_mood(mood)  # safe to call again if mood was already resolved
     cache_key = (city.strip().lower(), mood, when)
 
