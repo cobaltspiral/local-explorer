@@ -54,19 +54,20 @@ CATEGORY_KEYS = ["amenity", "leisure", "tourism", "historic",
 # Places with these tags are usually more notable (better-known, better-mapped).
 RICHNESS_KEYS = ["wikipedia", "wikidata", "website", "opening_hours", "description"]
 
+
 def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
     """Builds the Overpass query text.
 
-    'nwr' means nodes, ways and relations (points, buildings, areas).
-    'around:R,lat,lon' means 'within R metres of this point'.
+    'nw' means nodes and ways (points and buildings/areas). We skip relations,
+    which are the slowest to search. ["name"] keeps only named places, so the
+    server has far less to return.
     """
     parts = [
-        f'nwr["{key}"="{value}"](around:{radius_m},{lat},{lon});'
+        f'nw["{key}"="{value}"]["name"](around:{radius_m},{lat},{lon});'
         for key, value in tags
     ]
     body = "\n  ".join(parts)
-    return f"[out:json][timeout:25];\n(\n  {body}\n);\nout center tags 150;"
-
+    return f"[out:json][timeout:20];\n(\n  {body}\n);\nout center tags 100;"
 
 def run_overpass(query: str) -> list:
     """Sends the query, trying each server and retrying with a pause if busy."""
