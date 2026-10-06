@@ -1,5 +1,8 @@
+import math
 import time
 import httpx
+
+from moods import MOOD_TAGS, DURATIONS, pick_mood
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
@@ -37,6 +40,127 @@ def geocode(query: str) -> dict | None:
         "display_name": top["display_name"],
     }
 
+# The public Overpass servers get busy, so we try a second one if the first fails.
+OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
+
+# Used to label each place (e.g. "cafe", "park").
+CATEGORY_KEYS = ["amenity", "leisure", "tourism", "historic",
+                 "shop", "natural", "man_made", "sport", "waterway"]
+
+# Places with these tags are usually more notable (better-known, better-mapped).
+RICHNESS_KEYS = ["wikipedia", "wikidata", "website", "opening_hours", "description"]
+
+def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
+    """Builds the Overpass query text.
+
+    'nwr' means nodes, ways and relations (points, buildings, areas).
+    'around:R,lat,lon' means 'within R metres of this point'.
+    """
+    parts = [
+        f'nwr["{key}"="{value}"](around:{radius_m},{lat},{lon});'
+        for key, value in tags
+    ]
+    body = "\n  ".join(parts)
+    return f"[out:json][timeout:25];\n(\n  {body}\n);\nout center tags 150;"
+
+
+def run_overpass(query: str) -> list:
+    """Sends the query, trying each server in turn."""
+    for url in OVERPASS_URLS:
+        try:
+            response = httpx.post(
+                url, data={"data": query}, headers=HEADERS, timeout=40
+            )
+            response.raise_for_status()
+            return response.json()["elements"]
+        except (httpx.HTTPError, ValueError):
+            continue
+    raise RuntimeError("All Overpass servers failed. Try again in a minute.")
+
+def distance_m(lat1, lon1, lat2, lon2) -> float:
+    """Straight-line distance in metres between two points (haversine formula)."""
+    r = 6371000
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+def parse_elements(elements: list, lat: float, lon: float) -> list:
+    """Turns raw Overpass results into clean, deduplicated place dicts."""
+    places = []
+    for el in elements:
+        tags = el.get("tags", {})
+        name = tags.get("name")
+        if not name:
+            continue
+
+        # Points have lat/lon directly. Buildings and areas have a 'center'.
+        if el["type"] == "node":
+            p_lat, p_lon = el["lat"], el["lon"]
+        else:
+            center = el.get("center")
+            if not center:
+                continue
+            p_lat, p_lon = center["lat"], center["lon"]
+
+        category = next((tags[k] for k in CATEGORY_KEYS if k in tags), "place")
+        richness = sum(1 for k in RICHNESS_KEYS if k in tags)
+
+        places.append({
+            "name": name,
+            "category": category.replace("_", " "),
+            "lat": p_lat,
+            "lon": p_lon,
+            "distance_m": round(distance_m(lat, lon, p_lat, p_lon)),
+            "website": tags.get("website"),
+            "opening_hours": tags.get("opening_hours"),
+            "_richness": richness,
+        })
+
+    # Best-known first, then closest. Then drop duplicate names.
+    places.sort(key=lambda p: (-p["_richness"], p["distance_m"]))
+    seen, unique = set(), []
+    for p in places:
+        key = p["name"].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        p.pop("_richness")
+        unique.append(p)
+    return unique
+
+def _search(lat, lon, tags, radius_m):
+    query = build_query(lat, lon, tags, radius_m)
+    return parse_elements(run_overpass(query), lat, lon)
+
+def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
+    """Main function: find up to 20 candidate places for this mood and duration."""
+    mood = pick_mood(mood)
+    radius = DURATIONS[duration]["radius_m"]
+    tags = MOOD_TAGS[mood]
+
+    places = _search(lat, lon, tags, radius)
+
+    # Small town with few results? Widen the search once.
+    if len(places) < 3:
+        radius *= 2
+        places = _search(lat, lon, tags, radius)
+
+    return {"mood_used": mood, "radius_m": radius, "places": places[:20]}
+
+
 if __name__ == "__main__":
-    for place in ["Lisbon", "Brooklyn, New York", "Pisticci", "asdkjhasdkjh"]:
-        print(place, "->", geocode(place))
+    spot = geocode("Lisbon")
+    print("Geocoded:", spot["display_name"], "\n")
+
+    for mood, duration in [("cosy", "30min"), ("history", "half_day"), ("surprise", "1-2hrs")]:
+        result = find_places(spot["lat"], spot["lon"], mood, duration)
+        print(f"--- {mood} / {duration}  (mood used: {result['mood_used']}, "
+              f"radius: {result['radius_m']} m, {len(result['places'])} places) ---")
+        for p in result["places"][:5]:
+            print(f"  {p['name']}  [{p['category']}]  {p['distance_m']} m")
+        print()
