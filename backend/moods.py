@@ -4,39 +4,32 @@ import random
 # Example: ("amenity", "cafe") means "anything tagged amenity=cafe".
 MOOD_TAGS = {
     "cosy": [
-        ("amenity", "cafe"), ("amenity", "library"),
-        ("shop", "books"), ("shop", "tea"),
+        ("amenity", "cafe"),
     ],
     "outdoors": [
-        ("leisure", "park"), ("leisure", "garden"),
-        ("natural", "peak"), ("tourism", "viewpoint"),
+        ("leisure", "park"),
     ],
     "adventurous": [
-        ("natural", "peak"), ("leisure", "nature_reserve"),
-        ("sport", "climbing"), ("waterway", "waterfall"),
+        ("natural", "peak"),
     ],
     "creative": [
-        ("tourism", "gallery"), ("amenity", "arts_centre"),
+        ("tourism", "gallery"),
     ],
     "social": [
-        ("amenity", "pub"), ("amenity", "bar"),
-        ("leisure", "bowling_alley"), ("amenity", "biergarten"),
+        ("amenity", "pub"),
     ],
     "food": [
         ("amenity", "restaurant"), ("amenity", "marketplace"),
         ("amenity", "food_court"),
     ],
     "history": [
-        ("tourism", "museum"), ("historic", "castle"),
-        ("historic", "monument"), ("historic", "ruins"),
-        ("historic", "archaeological_site"), ("historic", "fort"),
+        ("tourism", "museum"),
     ],
     "thrifting": [
         ("shop", "second_hand"), ("shop", "charity"),
-        ("shop", "antiques"), ("amenity", "marketplace"),
+        ("shop", "antiques"),
     ],
     "unusual": [
-        ("tourism", "attraction"), ("historic", "ruins"),
         ("man_made", "lighthouse"),
     ],
 }
