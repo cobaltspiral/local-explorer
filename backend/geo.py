@@ -44,6 +44,7 @@ def geocode(query: str) -> dict | None:
 OVERPASS_URLS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
 ]
 
 # Used to label each place (e.g. "cafe", "park").
@@ -68,17 +69,23 @@ def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
 
 
 def run_overpass(query: str) -> list:
-    """Sends the query, trying each server in turn."""
-    for url in OVERPASS_URLS:
-        try:
-            response = httpx.post(
-                url, data={"data": query}, headers=HEADERS, timeout=40
-            )
-            response.raise_for_status()
-            return response.json()["elements"]
-        except (httpx.HTTPError, ValueError):
-            continue
-    raise RuntimeError("All Overpass servers failed. Try again in a minute.")
+    """Sends the query, trying each server and retrying with a pause if busy."""
+    last_error = None
+    for attempt in range(3):
+        for url in OVERPASS_URLS:
+            try:
+                response = httpx.post(
+                    url, data={"data": query}, headers=HEADERS, timeout=40
+                )
+                response.raise_for_status()
+                return response.json()["elements"]
+            except (httpx.HTTPError, ValueError) as e:
+                last_error = f"{url} -> {e!r}"
+                print(f"  (Overpass problem: {last_error})")
+        wait = 5 * (attempt + 1)  # wait 5s, then 10s, then 15s
+        print(f"  Retrying in {wait}s...")
+        time.sleep(wait)
+    raise RuntimeError(f"All Overpass servers failed. Last error: {last_error}")
 
 def distance_m(lat1, lon1, lat2, lon2) -> float:
     """Straight-line distance in metres between two points (haversine formula)."""
@@ -154,7 +161,7 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
 
 
 if __name__ == "__main__":
-    spot = geocode("Lisbon")
+    spot = geocode("Edinburgh")
     print("Geocoded:", spot["display_name"], "\n")
 
     for mood, duration in [("cosy", "30min"), ("history", "half_day"), ("surprise", "1-2hrs")]:
@@ -164,3 +171,4 @@ if __name__ == "__main__":
         for p in result["places"][:5]:
             print(f"  {p['name']}  [{p['category']}]  {p['distance_m']} m")
         print()
+        time.sleep(5)  # be polite to the free Overpass servers
