@@ -181,6 +181,16 @@ def recommend(answers: dict, places: list, events: list) -> dict:
 
 # ---------- Quick test ----------
 
+# Sample places for testing Gemma when Overpass is down.
+# Coordinates are approximate and only used for this test.
+SAMPLE_PLACES = [
+    {"name": "Fruitmarket Gallery", "category": "gallery", "lat": 55.9519, "lon": -3.1887, "distance_m": 400, "website": None, "opening_hours": None},
+    {"name": "Collective", "category": "gallery", "lat": 55.9547, "lon": -3.1815, "distance_m": 900, "website": None, "opening_hours": None},
+    {"name": "Talbot Rice Gallery", "category": "gallery", "lat": 55.9470, "lon": -3.1888, "distance_m": 1100, "website": None, "opening_hours": None},
+    {"name": "Summerhall", "category": "arts centre", "lat": 55.9400, "lon": -3.1812, "distance_m": 2300, "website": None, "opening_hours": None},
+    {"name": "Scottish National Gallery of Modern Art", "category": "gallery", "lat": 55.9514, "lon": -3.2279, "distance_m": 3000, "website": None, "opening_hours": None},
+]
+
 if __name__ == "__main__":
     from geo import geocode, find_places
     from search import find_events
@@ -188,13 +198,19 @@ if __name__ == "__main__":
     answers = {"location": "Edinburgh", "mood": "creative",
                "duration": "1-2hrs", "time_of_day": "afternoon"}
 
-    spot = geocode(answers["location"])
-    found = find_places(spot["lat"], spot["lon"], answers["mood"], answers["duration"])
-    answers["mood"] = found["mood_used"]  # so "surprise" stays consistent
+    try:
+        spot = geocode(answers["location"])
+        found = find_places(spot["lat"], spot["lon"], answers["mood"], answers["duration"])
+        places = found["places"]
+        answers["mood"] = found["mood_used"]  # so "surprise" stays consistent
+    except Exception as e:
+        print(f"\n(Overpass failed: {e})\n(Using SAMPLE_PLACES so we can still test Gemma)\n")
+        places = SAMPLE_PLACES
+
     events = find_events(answers["location"], answers["mood"])
 
     print(f"\nAsking {LLM_MODEL}... (the first call can take a minute)")
     start = time.time()
-    result = recommend(answers, found["places"], events)
+    result = recommend(answers, places, events)
     print(f"Done in {time.time() - start:.1f}s\n")
     print(json.dumps(result, indent=2, ensure_ascii=False))
