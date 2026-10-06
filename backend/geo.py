@@ -1,6 +1,11 @@
+import os
+from urllib.parse import urlparse
+from dotenv import load_dotenv
 import math
 import time
 import httpx
+
+load_dotenv()
 
 from moods import MOOD_TAGS, DURATIONS, pick_mood
 
@@ -40,12 +45,15 @@ def geocode(query: str) -> dict | None:
         "display_name": top["display_name"],
     }
 
-# The public Overpass servers get busy, so we try a second one if the first fails.
-OVERPASS_URLS = [
+PUBLIC_OVERPASS_URLS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
+
+# Your private endpoint goes first if it's set in .env
+PRIVATE_OVERPASS = os.getenv("OVERPASS_PRIVATE_URL")
+OVERPASS_URLS = ([PRIVATE_OVERPASS] if PRIVATE_OVERPASS else []) + PUBLIC_OVERPASS_URLS
 
 # Used to label each place (e.g. "cafe", "park").
 CATEGORY_KEYS = ["amenity", "leisure", "tourism", "historic",
@@ -71,20 +79,29 @@ def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
 
 
 def run_overpass(query: str) -> list:
-    """Sends the query, trying each server and retrying with a pause if busy."""
+    """Tries each server in turn, retrying with a pause if all are busy."""
     last_error = None
     for attempt in range(3):
         for url in OVERPASS_URLS:
+            label = urlparse(url).netloc  # e.g. "overpass.nextgis.com", never the key
             try:
                 response = httpx.post(
                     url, data={"data": query}, headers=HEADERS, timeout=40
                 )
                 response.raise_for_status()
-                return response.json()["elements"]
+                data = response.json()
+
+                remark = data.get("remark", "")
+                if "runtime error" in remark.lower() or "timed out" in remark.lower():
+                    raise ValueError(f"server remark: {remark}")
+
+                return data["elements"]
+            except httpx.HTTPStatusError as e:
+                last_error = f"{label} -> HTTP {e.response.status_code}"
             except (httpx.HTTPError, ValueError) as e:
-                last_error = f"{url} -> {e!r}"
-                print(f"  (Overpass problem: {last_error})")
-        wait = 5 * (attempt + 1)  # wait 5s, then 10s, then 15s
+                last_error = f"{label} -> {type(e).__name__}"
+            print(f"  (Overpass problem: {last_error})")
+        wait = 5 * (attempt + 1)
         print(f"  Retrying in {wait}s...")
         time.sleep(wait)
     raise RuntimeError(f"All Overpass servers failed. Last error: {last_error}")
