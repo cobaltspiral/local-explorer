@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Mochi from "./Mochi.jsx";
 import { useTypewriter } from "./useTypewriter";
+import ResultMap from "./ResultMap";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -45,6 +46,12 @@ const LOADING_MSGS = [
   "Thinking hard... this can take a minute!",
   "Almost there. Find your shoes!",
 ];
+
+const directionsUrl = (s) =>
+  `https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route=%3B${s.lat}%2C${s.lon}`;
+
+const formatDistance = (m) =>
+  m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
 
 function LocationInput({ onSubmit }) {
   const [value, setValue] = useState("");
