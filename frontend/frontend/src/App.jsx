@@ -108,7 +108,7 @@ export default function App() {
   let speech = "";
   if (phase === "asking") speech = QUESTIONS[step].text;
   else if (phase === "loading") speech = LOADING_MSGS[loadIdx];
-  else if (phase === "result") speech = result.intro;
+  else if (phase === "result") speech = result.message;
   else speech = errorMsg;
 
   const { shown, done } = useTypewriter(speech);

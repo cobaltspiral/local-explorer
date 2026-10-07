@@ -30,10 +30,10 @@ Rules:
 - Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place or an event.
 - Choose places that suit the mood, the time of day and the time available. For evening or night, prefer bars, restaurants and lively places. For morning, prefer parks, cafes and markets.
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
-- "intro" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing.
-- Never write IDs like P1 or E2 inside "intro", "why" or "tip". Use the place's name instead.
+- "message" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing. Don't greet the user (e.g., no 'hi', hello there' etc.).
+- Never write IDs like P1 or E2 inside "message", "why" or "tip". Use the place's name instead.
 - Reply with JSON only, in exactly this shape:
-{"intro": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
+{"message": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
 
 
 def build_messages(answers: dict, places: list, n_stops: int) -> list:
@@ -116,8 +116,8 @@ def validate(data: dict, places: list, n_stops: int) -> dict:
     if not stops:
         raise ValueError("Gemma returned no valid stops")
 
-    intro = clean_text(str(data.get("intro", "")).strip(), names) or "Hi, I'm Mochi! I found something fun for you."
-    return {"intro": intro, "stops": stops, "fallback": False}
+    message = clean_text(str(data.get("message", "")).strip(), names) or "Hi, I'm Mochi! I found something fun for you."
+    return {"message": message, "stops": stops, "fallback": False}
 
 
 def fallback_result(places: list, n_stops: int) -> dict:
@@ -129,7 +129,7 @@ def fallback_result(places: list, n_stops: int) -> dict:
     } for p in places[:n_stops]]
 
     return {
-        "intro": "Mochi's brain is melting, so here are the best spots I could find. Now go outside!",
+        "message": "Mochi's brain is melting, so here are the best spots I could find. Now go outside!",
         "stops": stops, "fallback": True,
     }
 
@@ -138,7 +138,7 @@ def recommend(answers: dict, places: list) -> dict:
     """Main function: always returns a result, never crashes."""
     n_stops = DURATIONS[answers["duration"]]["stops"]
     if not places:
-        return {"intro": "Hmm, I couldn't find anything nearby. Try another mood or a bigger area!",
+        return {"message": "Hmm, I couldn't find anything nearby. Try another mood or a bigger area!",
                 "stops": [], "fallback": True}
 
     messages = build_messages(answers, places, n_stops)
