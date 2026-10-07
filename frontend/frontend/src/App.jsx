@@ -124,7 +124,7 @@ export default function App() {
     return () => clearInterval(id);
   }, [phase]);
 
-  // Flap Pip's mouth while the text is typing
+  // Flap Mochi's mouth while the text is typing
   useEffect(() => {
     if (done) {
       setMouthOpen(false);
@@ -221,18 +221,30 @@ export default function App() {
           {answers.mood === "surprise" && (
             <p className="note">I picked "{result.mood_used}" for you!</p>
           )}
+
+          {result.stops.length > 0 && <ResultMap stops={result.stops} />}
+
           {result.stops.map((s, i) => (
             <div key={s.name} className="nes-container is-rounded stop">
               <p className="stop-name">
-                {i + 1}. {s.name}
+                <span className="badge">{i + 1}</span> {s.name}
               </p>
               <p className="meta">
-                {s.category} · {s.distance_m} m away
+                {s.category} · {formatDistance(s.distance_m)} away
               </p>
               {s.why && <p>{s.why}</p>}
               {s.tip && <p className="tip">Tip: {s.tip}</p>}
+              <a
+                className="nes-btn is-success go"
+                href={directionsUrl(s)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Go touch grass!
+              </a>
             </div>
           ))}
+
           <div className="choices">
             <button className="nes-btn is-primary" onClick={startOver}>
               Ask me again
