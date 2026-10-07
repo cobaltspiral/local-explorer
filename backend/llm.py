@@ -27,7 +27,7 @@ TIME_HINTS = {
 SYSTEM_PROMPT = """You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
 You recommend things using ONLY the numbered lists you are given.
 Rules:
-- Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place.
+- Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place or an event.
 - Choose places that suit the mood, the time of day and the time available. For evening or night, prefer bars, restaurants and lively places. For morning, prefer parks, cafes and markets.
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
 - "intro" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing.
@@ -47,11 +47,10 @@ The person is in {answers['location']}.
 Mood: {answers['mood']}
 Time available: {answers['duration']}
 Time of day: {TIME_HINTS.get(answers['time_of_day'], answers['time_of_day'])}
-
 Choose exactly {n_stops} stop(s) from the places, in a sensible order.
 
 PLACES:
-{chr(10).join(place_lines) if place_lines else '(none)'}
+{chr(10).join(place_lines) if place_lines else '(none)'}"""
 
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
