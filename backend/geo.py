@@ -78,19 +78,22 @@ def is_chain_name(name: str) -> bool:
     return any(n == c or n.startswith(c + " ") for c in CHAIN_NAMES)
 
 
-def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
-    """Builds the Overpass query text.
+PER_TAG_LIMIT = 100
+TAGS_PER_REQUEST = 1 
 
-    'nw' means nodes and ways (points and buildings/areas). We skip relations,
-    which are the slowest to search. ["name"] keeps only named places, so the
-    server has far less to return.
+
+def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
+    """One statement per tag, each with its own result limit.
+
+    'nw' = nodes and ways. ["name"] keeps only named places.
+    Each 'out' caps that tag's results, so no tag crowds out the others.
     """
     parts = [
-        f'nw["{key}"="{value}"]["name"](around:{radius_m},{lat},{lon});'
+        f'nw["{key}"="{value}"]["name"](around:{radius_m},{lat},{lon});\n'
+        f'out center tags {PER_TAG_LIMIT};'
         for key, value in tags
     ]
-    body = "\n  ".join(parts)
-    return f"[out:json][timeout:20];\n(\n  {body}\n);\nout center tags 100;"
+    return "[out:json][timeout:25];\n" + "\n".join(parts)
 
 
 def run_overpass(query: str) -> list:
@@ -208,31 +211,31 @@ def _search(lat, lon, tags, radius_m):
 _places_cache: dict = {}
 
 def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
-    """Main function: a fresh random selection of up to 20 candidate places."""
+    """A fresh random selection of up to 20 candidate places."""
     mood = pick_mood(mood)
-    cache_key = (round(lat, 2), round(lon, 2), mood, duration)
+    radius = DURATIONS[duration]["radius_m"]
+    all_tags = MOOD_TAGS[mood]
 
-    cached = _places_cache.get(cache_key)
-    if cached:
-        print("  (places: cache hit)")
-    else:
-        radius = DURATIONS[duration]["radius_m"]
-        pool = _search(lat, lon, MOOD_TAGS[mood], radius)
+    chosen = random.sample(all_tags, min(TAGS_PER_REQUEST, len(all_tags)))
 
-        # Small town with few results? Widen the search once.
-        if len(pool) < 3:
-            radius *= 2
-            pool = _search(lat, lon, MOOD_TAGS[mood], radius)
-
-        cached = {"mood_used": mood, "radius_m": radius, "pool": pool}
+    def fetch(tags, rad):
+        key = (round(lat, 2), round(lon, 2), tuple(sorted(tags)), rad)
+        if key in _places_cache:
+            print("  (places: cache hit)")
+            return _places_cache[key]
+        pool = _search(lat, lon, tags, rad)
         if pool:  # only cache real answers
-            _places_cache[cache_key] = cached
+            _places_cache[key] = pool
+        return pool
 
-    return {
-        "mood_used": cached["mood_used"],
-        "radius_m": cached["radius_m"],
-        "places": diversify(cached["pool"]),
-    }
+    pool = fetch(chosen, radius)
+
+    # Too few results? Widen the radius and use ALL of the mood's tags once.
+    if len(pool) < 3:
+        radius *= 2
+        pool = fetch(all_tags, radius)
+
+    return {"mood_used": mood, "radius_m": radius, "places": diversify(pool)}
 
 
 if __name__ == "__main__":
