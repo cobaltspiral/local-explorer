@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from geo import geocode, find_places
-from search import find_events
 from llm import recommend
 
 app = FastAPI(title="Mochi the Explorer API")
@@ -56,9 +55,6 @@ def api_recommend(body: Answers):
 
     mood_used = found["mood_used"]  # resolves "surprise" to a real mood
 
-    # 3. Events (never raises: returns [] on failure)
-    events = find_events(body.location, mood_used)
-
     # 4. Gemma writes the recommendation (never raises either)
     answers = {
         "location": body.location,
@@ -66,7 +62,7 @@ def api_recommend(body: Answers):
         "duration": body.duration,
         "time_of_day": body.time_of_day,
     }
-    result = recommend(answers, found["places"], events)
+    result = recommend(answers, found["places"])
 
     result["mood_used"] = mood_used
     result["center"] = {"lat": spot["lat"], "lon": spot["lon"],

@@ -43,17 +43,6 @@ DURATIONS = {
     "multiple_days": {"radius_m": 40000, "stops": 8},
 }
 
-MOOD_EVENT_QUERY = {
-    "cosy": "cosy events book readings",
-    "outdoors": "outdoor events",
-    "adventurous": "outdoor adventure events",
-    "creative": "art exhibitions and creative workshops",
-    "social": "social events and meetups",
-    "food": "food markets and food festivals",
-    "history": "history exhibitions and tours",
-    "thrifting": "flea markets and vintage markets",
-    "unusual": "unusual and quirky events",
-}
 
 def pick_mood(mood: str) -> str:
     """Turns 'surprise' into a random real mood. Passes others through."""

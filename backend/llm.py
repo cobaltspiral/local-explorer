@@ -27,32 +27,20 @@ TIME_HINTS = {
 SYSTEM_PROMPT = """You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
 You recommend things using ONLY the numbered lists you are given.
 Rules:
-- Refer to places and events ONLY by their ID (like P3 or E2). Never invent an ID, a place or an event.
-- Items marked [EVENT] are specific events. Items marked [WEB PAGE] are just pages listing what's on: never pretend a web page is a specific event, say it is a page worth checking.
+- Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place.
 - Choose places that suit the mood, the time of day and the time available. For evening or night, prefer bars, restaurants and lively places. For morning, prefer parks, cafes and markets.
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
 - "intro" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing.
 - Never write IDs like P1 or E2 inside "intro", "why" or "tip". Use the place's name instead.
 - Reply with JSON only, in exactly this shape:
-{"intro": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}], "event": {"id": "E1", "why": "..."} or null}"""
+{"intro": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
 
 
-def build_messages(answers: dict, places: list, events: list, n_stops: int) -> list:
+def build_messages(answers: dict, places: list, n_stops: int) -> list:
     place_lines = [
         f"P{i}: {p['name']} ({p['category']}), {p['distance_m']} m from the centre"
         for i, p in enumerate(places, 1)
     ]
-
-    event_lines = []
-    for i, e in enumerate(events, 1):
-        desc = (e.get("description") or "")[:200]
-        if e.get("type") == "event":
-            event_lines.append(
-                f"E{i}: [EVENT] {e.get('title')} | when: {e.get('date') or 'date unknown'} "
-                f"| where: {e.get('venue') or 'venue unknown'} | {desc}"
-            )
-        else:
-            event_lines.append(f"E{i}: [WEB PAGE] {e.get('title')} | {desc}")
 
     user_prompt = f"""Today is {date.today():%A %d %B %Y}.
 The person is in {answers['location']}.
@@ -61,13 +49,9 @@ Time available: {answers['duration']}
 Time of day: {TIME_HINTS.get(answers['time_of_day'], answers['time_of_day'])}
 
 Choose exactly {n_stops} stop(s) from the places, in a sensible order.
-Optionally choose ONE item from the events list if it genuinely fits, otherwise use null.
 
 PLACES:
 {chr(10).join(place_lines) if place_lines else '(none)'}
-
-EVENTS:
-{chr(10).join(event_lines) if event_lines else '(none)'}"""
 
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -109,12 +93,10 @@ def clean_text(text: str, names: dict) -> str:
                   lambda m: names.get(m.group(0).upper(), "this spot"), text)
 
 
-def validate(data: dict, places: list, events: list, n_stops: int) -> dict:
+def validate(data: dict, places: list, n_stops: int) -> dict:
     """Turn Gemma's IDs back into REAL data. Anything it invented is dropped."""
     place_by_id = {f"P{i}": p for i, p in enumerate(places, 1)}
-    event_by_id = {f"E{i}": e for i, e in enumerate(events, 1)}
     names = {k: p["name"] for k, p in place_by_id.items()}
-    names.update({k: e["title"] for k, e in event_by_id.items()})
 
     stops, seen = [], set()
     for s in data.get("stops", []):
@@ -135,26 +117,11 @@ def validate(data: dict, places: list, events: list, n_stops: int) -> dict:
     if not stops:
         raise ValueError("Gemma returned no valid stops")
 
-    event = None
-    ev = data.get("event")
-    if isinstance(ev, dict):
-        eid = str(ev.get("id", "")).strip().upper()
-        if eid in event_by_id:
-            e = event_by_id[eid]
-            event = {
-                "title": e["title"],
-                "date": e.get("date"),
-                "venue": e.get("venue"),
-                "link": e.get("link"),
-                "type": e.get("type"),
-                "why": clean_text(str(ev.get("why", "")).strip(), names),
-            }
-
     intro = clean_text(str(data.get("intro", "")).strip(), names) or "Hi, I'm Mochi! I found something fun for you."
-    return {"intro": intro, "stops": stops, "event": event, "fallback": False}
+    return {"intro": intro, "stops": stops, "fallback": False}
 
 
-def fallback_result(places: list, events: list, n_stops: int) -> dict:
+def fallback_result(places: list, n_stops: int) -> dict:
     """Used when Gemma fails twice. No AI, just the best-ranked real places."""
     stops = [{
         "name": p["name"], "category": p["category"], "lat": p["lat"], "lon": p["lon"],
@@ -162,33 +129,27 @@ def fallback_result(places: list, events: list, n_stops: int) -> dict:
         "why": f"A {p['category']} about {p['distance_m']} m away.", "tip": "",
     } for p in places[:n_stops]]
 
-    event = None
-    if events:
-        e = events[0]
-        event = {"title": e["title"], "date": e.get("date"), "venue": e.get("venue"),
-                 "link": e.get("link"), "type": e.get("type"), "why": ""}
-
     return {
         "intro": "Mochi's brain is melting, so here are the best spots I could find. Now go outside!",
-        "stops": stops, "event": event, "fallback": True,
+        "stops": stops, "fallback": True,
     }
 
 
-def recommend(answers: dict, places: list, events: list) -> dict:
+def recommend(answers: dict, places: list) -> dict:
     """Main function: always returns a result, never crashes."""
     n_stops = DURATIONS[answers["duration"]]["stops"]
     if not places:
         return {"intro": "Hmm, I couldn't find anything nearby. Try another mood or a bigger area!",
-                "stops": [], "event": None, "fallback": True}
+                "stops": [], "fallback": True}
 
-    messages = build_messages(answers, places, events, n_stops)
+    messages = build_messages(answers, places, n_stops)
     for attempt in (1, 2):
         try:
             raw = call_llm(messages)
-            return validate(parse_json(raw), places, events, n_stops)
+            return validate(parse_json(raw), places, n_stops)
         except Exception as e:
             print(f"  (Gemma attempt {attempt} failed: {type(e).__name__}: {e})")
-    return fallback_result(places, events, n_stops)
+    return fallback_result(places, n_stops)
 
 
 # ---------- Quick test ----------
@@ -205,7 +166,6 @@ SAMPLE_PLACES = [
 
 if __name__ == "__main__":
     from geo import geocode, find_places
-    from search import find_events
 
     answers = {"location": "Edinburgh", "mood": "creative",
                "duration": "1-2hrs", "time_of_day": "afternoon"}
@@ -219,10 +179,9 @@ if __name__ == "__main__":
         print(f"\n(Overpass failed: {e})\n(Using SAMPLE_PLACES so we can still test Gemma)\n")
         places = SAMPLE_PLACES
 
-    events = find_events(answers["location"], answers["mood"])
 
     print(f"\nAsking {LLM_MODEL}... (the first call can take a minute)")
     start = time.time()
-    result = recommend(answers, places, events)
+    result = recommend(answers, places)
     print(f"Done in {time.time() - start:.1f}s\n")
     print(json.dumps(result, indent=2, ensure_ascii=False))
