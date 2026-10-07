@@ -32,6 +32,8 @@ Rules:
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
 - "message" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing. Don't greet the user (e.g., no 'hi', hello there' etc.).
 - Never write IDs like P1 or E2 inside "message", "why" or "tip". Use the place's name instead.
+- The user LIVES here and has probably seen the obvious spots, so help them discover somewhere new. Prefer lesser-known, independent, local-feeling places over famous ones, and avoid big chains.
+- The list is in random order. Do not favour the first items, and do not favour the closest. Pick something a little unexpected that still fits the mood.
 - Reply with JSON only, in exactly this shape:
 {"message": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
 
@@ -66,7 +68,7 @@ def call_llm(messages: list) -> str:
         json={
             "model": LLM_MODEL,
             "messages": messages,
-            "temperature": 0.4,
+            "temperature": 0.6,
             "max_tokens": 700,
             "response_format": {"type": "json_object"},
             "reasoning_effort": "none",

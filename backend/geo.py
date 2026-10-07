@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import math
 import time
 import httpx
+import random
 
 load_dotenv()
 
@@ -59,8 +60,22 @@ OVERPASS_URLS = ([PRIVATE_OVERPASS] if PRIVATE_OVERPASS else []) + PUBLIC_OVERPA
 CATEGORY_KEYS = ["amenity", "leisure", "tourism", "historic",
                  "shop", "natural", "man_made", "sport", "waterway"]
 
-# Places with these tags are usually more notable (better-known, better-mapped).
-RICHNESS_KEYS = ["wikipedia", "wikidata", "website", "opening_hours", "description"]
+# A place with any of these tags is probably real and still operating
+DETAIL_KEYS = ["opening_hours", "website", "phone", "description"]
+
+# Backup chain list, for chains nobody tagged with a "brand" in OpenStreetMap.
+# Add the chains you keep seeing in your city.
+CHAIN_NAMES = {
+    "starbucks", "costa", "costa coffee", "caffè nero", "caffe nero",
+    "pret a manger", "greggs", "mcdonald's", "burger king", "kfc", "subway",
+    "tesco", "sainsbury's", "wetherspoons", "five guys", "nando's",
+    "pizza express", "wagamama", "black sheep coffee",
+}
+
+
+def is_chain_name(name: str) -> bool:
+    n = name.lower().strip()
+    return any(n == c or n.startswith(c + " ") for c in CHAIN_NAMES)
 
 
 def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
@@ -118,12 +133,17 @@ def distance_m(lat1, lon1, lat2, lon2) -> float:
 
 
 def parse_elements(elements: list, lat: float, lon: float) -> list:
-    """Turns raw Overpass results into clean, deduplicated place dicts."""
+    """Turns raw Overpass results into clean place dicts, tagged by 'tier':
+    0 = independent, 1 = well-known landmark, 2 = chain."""
     places = []
     for el in elements:
         tags = el.get("tags", {})
         name = tags.get("name")
         if not name:
+            continue  # skip anything without a name
+
+        # Skip embassies and other offices that are mis-tagged as sights
+        if tags.get("amenity") == "embassy" or tags.get("office") == "diplomatic":
             continue
 
         # Points have lat/lon directly. Buildings and areas have a 'center'.
@@ -136,7 +156,13 @@ def parse_elements(elements: list, lat: float, lon: float) -> list:
             p_lat, p_lon = center["lat"], center["lon"]
 
         category = next((tags[k] for k in CATEGORY_KEYS if k in tags), "place")
-        richness = sum(1 for k in RICHNESS_KEYS if k in tags)
+
+        if tags.get("brand") or tags.get("brand:wikidata") or is_chain_name(name):
+            tier = 2
+        elif tags.get("wikipedia") or tags.get("wikidata"):
+            tier = 1
+        else:
+            tier = 0
 
         places.append({
             "name": name,
@@ -146,20 +172,32 @@ def parse_elements(elements: list, lat: float, lon: float) -> list:
             "distance_m": round(distance_m(lat, lon, p_lat, p_lon)),
             "website": tags.get("website"),
             "opening_hours": tags.get("opening_hours"),
-            "_richness": richness,
+            "_tier": tier,
+            "_details": any(k in tags for k in DETAIL_KEYS),
         })
 
-    # Best-known first, then closest. Then drop duplicate names.
-    places.sort(key=lambda p: (-p["_richness"], p["distance_m"]))
+    # Drop duplicate names (keeps the nearest branch)
+    places.sort(key=lambda p: p["distance_m"])
     seen, unique = set(), []
     for p in places:
         key = p["name"].lower()
         if key in seen:
             continue
         seen.add(key)
-        p.pop("_richness")
         unique.append(p)
     return unique
+
+
+def diversify(pool: list, limit: int = 20) -> list:
+    """Pick a fresh, different selection every time: independents first,
+    random within each tier, with a small boost for well-documented places."""
+    ranked = sorted(
+        pool,
+        key=lambda p: (p["_tier"], -(random.random() + (0.5 if p["_details"] else 0))),
+    )
+    picked = ranked[:limit]
+    random.shuffle(picked)  # so list position tells Gemma nothing
+    return [{k: v for k, v in p.items() if not k.startswith("_")} for p in picked]
 
 
 def _search(lat, lon, tags, radius_m):
@@ -170,28 +208,31 @@ def _search(lat, lon, tags, radius_m):
 _places_cache: dict = {}
 
 def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
-    """Main function: find up to 20 candidate places for this mood and duration."""
+    """Main function: a fresh random selection of up to 20 candidate places."""
     mood = pick_mood(mood)
-
     cache_key = (round(lat, 2), round(lon, 2), mood, duration)
-    if cache_key in _places_cache:
+
+    cached = _places_cache.get(cache_key)
+    if cached:
         print("  (places: cache hit)")
-        return _places_cache[cache_key]
+    else:
+        radius = DURATIONS[duration]["radius_m"]
+        pool = _search(lat, lon, MOOD_TAGS[mood], radius)
 
-    radius = DURATIONS[duration]["radius_m"]
-    tags = MOOD_TAGS[mood]
+        # Small town with few results? Widen the search once.
+        if len(pool) < 3:
+            radius *= 2
+            pool = _search(lat, lon, MOOD_TAGS[mood], radius)
 
-    places = _search(lat, lon, tags, radius)
+        cached = {"mood_used": mood, "radius_m": radius, "pool": pool}
+        if pool:  # only cache real answers
+            _places_cache[cache_key] = cached
 
-    # Small town with few results? Widen the search once.
-    if len(places) < 3:
-        radius *= 2
-        places = _search(lat, lon, tags, radius)
-
-    result = {"mood_used": mood, "radius_m": radius, "places": places[:20]}
-    if places:  # only cache real answers
-        _places_cache[cache_key] = result
-    return result
+    return {
+        "mood_used": cached["mood_used"],
+        "radius_m": cached["radius_m"],
+        "places": diversify(cached["pool"]),
+    }
 
 
 if __name__ == "__main__":
