@@ -19,15 +19,13 @@ MOOD_TAGS = {
         ("amenity", "pub"),
     ],
     "food": [
-        ("amenity", "restaurant"), ("amenity", "marketplace"),
-        ("amenity", "food_court"),
+        ("amenity", "restaurant"),
     ],
     "history": [
         ("tourism", "museum"),
     ],
     "thrifting": [
-        ("shop", "second_hand"), ("shop", "charity"),
-        ("shop", "antiques"),
+        ("shop", "second_hand"),
     ],
     "unusual": [
         ("man_made", "lighthouse"),
