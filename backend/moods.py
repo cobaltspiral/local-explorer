@@ -4,31 +4,76 @@ import random
 # Example: ("amenity", "cafe") means "anything tagged amenity=cafe".
 MOOD_TAGS = {
     "cosy": [
-        ("amenity", "cafe"),
+        ("amenity", "cafe"), ("cuisine", "ice_cream"), 
+        ("cuisine", "bakery"), ("cuisine", "bubble_tea"), 
+        ("amenity", "library"), ("shop", "bookstore"), 
+        ("shop", "bakery"), ("shop", "books"),
+        ("shop", "esoteric")
+
     ],
+
     "outdoors": [
-        ("leisure", "park"),
+        ("leisure", "park"), ("natural", "water"), 
+        ("natural", "beach"), ("leisure", "garden"), 
+        ("natural", "hills"), ("water", "canal"),
+        ("water", "river"), ("water", "stream"), 
+        ("water", "lake"), ("water", "waterfall"),
+        ("leisure", "swimming_pool"), ("leisure", "park"),
+        ("leisure", "beach"),
+
     ],
+
     "adventurous": [
-        ("natural", "peak"),
+        ("natural", "peak"), ("natural", "cliff"), 
+        ("natural", "waterfall"), ("natural", "viewpoint"), 
+        ("natural", "forest"),  ("water", "lake"),
+        ("water", "river"),  ("leisure", "nature_reserve"),
+        ("leisure", "hiking"), ("leisure", "wild_swimming"), 
+        ("water", "reservoir"), ("water", "lake"),
     ],
+
     "creative": [
         ("tourism", "gallery"),
     ],
+
     "social": [
-        ("amenity", "pub"),
+        ("amenity", "pub"), ("leisure", "sauna"), 
+        ("leisure", "social_club"), ("leisure", "axe_throwing"), 
+        ("leisure", "escape_game"), ("leisure", "nightclub"), 
+        ("leisure", "music_venue"), ("leisure", "karaoke"),
+        ("leisure", "rage_room"), ("leisure", "bingo_hall"),
     ],
+
     "food": [
         ("amenity", "restaurant"),
     ],
+
     "history": [
-        ("tourism", "museum"),
+        ("tourism", "museum"), ("building", "castle"), ("historic", "castle"),
     ],
+
     "thrifting": [
-        ("shop", "second_hand"),
+        ("shop", "second_hand"), ("shop", "charity"), 
+        ("shop", "antiques"),
     ],
+
     "unusual": [
-        ("man_made", "lighthouse"),
+        ("man_made", "lighthouse"), ("building", "bunker"), 
+        ("building", "airport"), ("man_made", "water_tower"), 
+        ("man_made", "windmill"), ("man_made", "silo"), 
+        ("natural", "volcano"), ("natural", "island"), 
+        ("natural", "cave_entrance"), ("natural", "geyser"), 
+        ("natural", "hot_spring"), ("natural", "spring"), 
+        ("natural", "sinkhole"), ("natural", "rock"), 
+        ("natural", "cliff"), ("natural", "canyon"), 
+        ("natural", "valley"), ("natural", "glacier"), 
+        ("natural", "waterfall"), ("leisure", "ice_rink"),
+        ("leisure", "axe_throwing"), ("leisure", "escape_game"),
+        ("leisure", "rage_room"), ("leisure", "bingo_hall"),
+        ("man_made", "gasometer"), ("man_made", "obelisk"),
+        ("shop", "psychic"), ("shop", "esoteric"),
+        ("shop", "junk_yard"),
+
     ],
 }
 
