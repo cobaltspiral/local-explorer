@@ -42,30 +42,14 @@ const FRAMES = {
   }),
 };
 
-export default function Mochi ({ frame = "idle", bounce = false, size = 128 }) {
-  const rows = FRAMES[frame] || FRAMES.idle;
-  const rects = [];
-  rows.forEach((row, y) => {
-    [...row].forEach((ch, x) => {
-      if (PALETTE[ch]) {
-        rects.push(
-          <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill={PALETTE[ch]} />
-        );
-      }
-    });
-  });
-
+export default function Mochi({ frame = "idle", bounce = false, size = 128 }) {
   return (
-    <svg
-      className={bounce ? "mochi bounce" : "mochi"}
-      viewBox="0 0 16 16"
+    <img
+      src={`/mochi-${frame}.png`}
       width={size}
       height={size}
-      shapeRendering="crispEdges"
-      role="img"
-      aria-label="Mochi, the pixel guide"
-    >
-      {rects}
-    </svg>
+      className={bounce ? "mochi bounce" : "mochi"}
+      alt="Mochi, the pixel guide"
+    />
   );
 }
