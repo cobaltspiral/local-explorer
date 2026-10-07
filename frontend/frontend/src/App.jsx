@@ -182,7 +182,7 @@ export default function App() {
 
   return (
     <main className="app">
-      <h1 className="title">Touch Grass</h1>
+      <h1 className="title">Mochi the Explorer</h1>
 
       <section className="stage">
         <Mochi frame={frame} bounce={phase === "loading"} />
