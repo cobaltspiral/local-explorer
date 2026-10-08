@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import re
 import time
 from datetime import date
@@ -30,13 +31,13 @@ Rules:
 - Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place or an event.
 - Choose places that suit the mood, the time of day and the time available. For evening or night, prefer bars, restaurants and lively places. For morning, prefer parks, cafes and markets.
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
-- "message" is two short sentences in Mochi's cheerful voice, and it ends by nudging the person to put their phone away and enjoy the outing. Don't greet the user (e.g., no 'hi', hello there' etc.).
-- Never write IDs like P1 or E2 inside "message", "why" or "tip". Use the place's name instead.
-- You're only choosing one place to recommend, so use the singular form in your message, e.g., "I found a fun spot for you" not "I found some fun spots for you".
+- Never write IDs like P1 or E2 inside "why" or "tip". Use the place's name instead.
+- You're only choosing one place to recommend, so use the singular form in your last message, e.g., "I found a fun spot for you" not "I found some fun spots for you".
+- In your last message, if you found a spot, don't mention the type (e.g., "I found a cosy place for you", but not "I found these bookshops for you").
 - The user LIVES here and has probably seen the obvious spots, so help them discover somewhere new. Prefer lesser-known, independent, local-feeling places over famous ones, and avoid big chains.
 - The list is in random order. Do not favour the first items, and do not favour the closest. Pick something a little unexpected that still fits the mood.
 - Reply with JSON only, in exactly this shape:
-{"message": "...", "stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
+{"stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
 
 
 def build_messages(answers: dict, places: list, n_stops: int) -> list:
@@ -137,6 +138,37 @@ def fallback_result(places: list, n_stops: int) -> dict:
     }
 
 
+MOOD_PHRASE = {
+    "cosy": "a cosy outing",
+    "outdoors": "a breath of fresh air",
+    "adventurous": "a little adventure",
+    "creative": "a creative outing",
+    "social": "a sociable outing",
+    "food": "something tasty",
+    "history": "a trip into the past",
+    "thrifting": "a treasure hunt",
+    "unusual": "something a bit different",
+}
+
+# Safe wording: no counts, no place types, no "we", no time of day.
+MESSAGES_ONE_STOP = [
+    "I found {phrase} for you: head to {name}! Put your phone away and enjoy it.",
+    "How about {name}? It's {phrase} waiting for you. Phone in your pocket, off you go!",
+    "Your next stop is {name}. Leave the screen behind and go and see it!",
+]
+MESSAGES_MANY_STOPS = [
+    "I found {phrase} for you. Start with {name}! Put your phone away and enjoy it.",
+    "Here's {phrase} for today, starting at {name}. Phone in your pocket, off you go!",
+    "Time for {phrase}! Begin at {name}, then follow the map. Leave the screen behind!",
+]
+
+
+def make_message(answers: dict, stops: list) -> str:
+    phrase = MOOD_PHRASE.get(answers["mood"], "something fun")
+    pool = MESSAGES_ONE_STOP if len(stops) == 1 else MESSAGES_MANY_STOPS
+    return random.choice(pool).format(phrase=phrase, name=stops[0]["name"])
+
+
 def recommend(answers: dict, places: list) -> dict:
     """Main function: always returns a result, never crashes."""
     n_stops = DURATIONS[answers["duration"]]["stops"]
@@ -148,10 +180,13 @@ def recommend(answers: dict, places: list) -> dict:
     for attempt in (1, 2):
         try:
             raw = call_llm(messages)
-            return validate(parse_json(raw), places, n_stops)
+            result = validate(parse_json(raw), places, n_stops)
+            result["message"] = make_message(answers, result["stops"])
+            return result
         except Exception as e:
             print(f"  (Gemma attempt {attempt} failed: {type(e).__name__}: {e})")
-    return fallback_result(places, n_stops)
+    result = fallback_result(places, n_stops)
+    return result
 
 
 # ---------- Quick test ----------
