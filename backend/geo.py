@@ -69,7 +69,7 @@ CHAIN_NAMES = {
     "starbucks", "costa", "costa coffee", "caffè nero", "caffe nero",
     "pret a manger", "greggs", "mcdonald's", "burger king", "kfc", "subway",
     "tesco", "sainsbury's", "wetherspoons", "five guys", "nando's",
-    "pizza express", "wagamama", "black sheep coffee",
+    "pizza express", "wagamama", "black sheep coffee", "hospital",
 }
 
 
