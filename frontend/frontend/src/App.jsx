@@ -222,8 +222,6 @@ export default function App() {
             <p className="note">I picked "{result.mood_used}" for you!</p>
           )}
 
-          {result.stops.length > 0 && <ResultMap stops={result.stops} />}
-
           {result.stops.map((s, i) => (
             <div key={s.name} className="nes-container is-rounded stop">
               <p className="stop-name">
@@ -244,6 +242,8 @@ export default function App() {
               </a>
             </div>
           ))}
+
+          {result.stops.length > 0 && <ResultMap stops={result.stops} />}
 
           <div className="choices">
             <button className="nes-btn is-primary" onClick={startOver}>
