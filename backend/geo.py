@@ -78,7 +78,7 @@ def is_chain_name(name: str) -> bool:
     return any(n == c or n.startswith(c + " ") for c in CHAIN_NAMES)
 
 
-PER_TAG_LIMIT = 100
+PER_TAG_LIMIT = 50
 TAGS_PER_REQUEST = 1 
 
 
@@ -230,12 +230,13 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
 
     pool = fetch(chosen, radius)
 
-    # Too few results? Widen the radius and use ALL of the mood's tags once.
+    # Too few results? Widen the radius and try a different tag (still just one).
     if len(pool) < 3:
         radius *= 2
-        pool = fetch(all_tags, radius)
+        others = [t for t in all_tags if t not in chosen] or all_tags
+        pool = fetch(random.sample(others, 1), radius)
 
-    return {"mood_used": mood, "radius_m": radius, "places": diversify(pool)}
+    return {"mood_used": mood, "radius_m": radius, "places": diversify(pool), "tags_used": [f"{key}={value}" for key, value in chosen],}
 
 
 if __name__ == "__main__":

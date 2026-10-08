@@ -1,7 +1,9 @@
 from geo import geocode, find_places
 
 spot = geocode("Edinburgh")
-for run in range(1, 5):
-    result = find_places(spot["lat"], spot["lon"], "cosy", "1-2hrs")
-    names = [p["name"] for p in result["places"][:8]]
-    print(f"Run {run}: {names}\n")
+for run in range(1, 6):
+    result = find_places(spot["lat"], spot["lon"], "unusual", "half_day")
+    print(f"Run {run}")
+    print(f"  tag:    {result['tags_used']}")
+    print(f"  radius: {result['radius_m']} m")
+    print(f"  places: {[p['name'] for p in result['places'][:6]]}\n")
