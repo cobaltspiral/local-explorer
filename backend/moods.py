@@ -60,19 +60,17 @@ MOOD_TAGS = {
     "unusual": [
         ("man_made", "lighthouse"), ("building", "bunker"), 
         ("building", "airport"), ("man_made", "water_tower"), 
-        ("man_made", "windmill"), ("man_made", "silo"), 
         ("natural", "volcano"), ("natural", "island"), 
         ("natural", "cave_entrance"), ("natural", "geyser"), 
         ("natural", "hot_spring"), ("natural", "spring"), 
         ("natural", "sinkhole"), ("natural", "rock"), 
-        ("natural", "cliff"), ("natural", "canyon"), 
+        ("natural", "cliff"),
         ("natural", "valley"), ("natural", "glacier"), 
         ("natural", "waterfall"), ("leisure", "ice_rink"),
         ("leisure", "axe_throwing"), ("leisure", "escape_game"),
         ("leisure", "rage_room"), ("leisure", "bingo_hall"),
-        ("man_made", "gasometer"), ("man_made", "obelisk"),
-        ("shop", "psychic"), ("shop", "esoteric"),
-        ("shop", "junk_yard"),
+        ("man_made", "gasometer"), ("shop", "psychic"), 
+        ("shop", "esoteric"), ("shop", "junk_yard"),
 
     ],
 }
