@@ -122,10 +122,10 @@ MOOD_TAGS = {
 # How far to search, and how many stops to recommend, per duration.
 DURATIONS = {
     "30min":         {"radius_m": 1500,  "stops": 1},
-    "1-2hrs":        {"radius_m": 4000,  "stops": 2},
-    "half_day":      {"radius_m": 10000, "stops": 3},
-    "full_day":      {"radius_m": 20000, "stops": 5},
-    "multiple_days": {"radius_m": 40000, "stops": 8},
+    "1-2hrs":        {"radius_m": 4000,  "stops": 1},
+    "half_day":      {"radius_m": 10000, "stops": 2},
+    "full_day":      {"radius_m": 20000, "stops": 4},
+    "multiple_days": {"radius_m": 40000, "stops": 6},
 }
 
 
