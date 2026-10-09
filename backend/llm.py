@@ -120,6 +120,18 @@ def validate(data: dict, places: list, n_stops: int) -> dict:
     if not stops:
         raise ValueError("Gemma returned no valid stops")
 
+    for pid, p in place_by_id.items():
+        if len(stops) >= n_stops:
+            break
+        if pid in seen:
+            continue
+        seen.add(pid)
+        stops.append({
+            "name": p["name"], "category": p["category"],
+            "lat": p["lat"], "lon": p["lon"], "distance_m": p["distance_m"],
+            "why": f"A {p['category']} about {p['distance_m']} m away.", "tip": "",
+        })
+
     message = clean_text(str(data.get("message", "")).strip(), names) or "Hi, I'm Mochi! I found something fun for you."
     return {"message": message, "stops": stops, "fallback": False}
 
@@ -172,6 +184,7 @@ def make_message(answers: dict, stops: list) -> str:
 def recommend(answers: dict, places: list) -> dict:
     """Main function: always returns a result, never crashes."""
     n_stops = DURATIONS[answers["duration"]]["stops"]
+    print(f"  (debug: {len(places)} places available, {n_stops} stops wanted)")
     if not places:
         return {"message": "Hmm, I couldn't find anything nearby. Try another mood or a bigger area!",
                 "stops": [], "fallback": True}
