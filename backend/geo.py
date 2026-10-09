@@ -70,7 +70,7 @@ CHAIN_NAMES = {
     "pret a manger", "greggs", "mcdonald's", "burger king", "kfc", "subway",
     "tesco", "sainsbury's", "wetherspoons", "five guys", "nando's",
     "pizza express", "wagamama", "black sheep coffee", "hospital", "prison",
-    "bridal", "motel", "apartment", "clinic", "pharmacy",
+    "bridal", "motel", "apartment", "clinic", "pharmacy", "school", "primary",
 }
 
 
@@ -81,6 +81,12 @@ def is_chain_name(name: str) -> bool:
 
 PER_TAG_LIMIT = 50
 TAGS_PER_REQUEST = 1 
+RADIUS_STEPS = [1, 2, 4]    # radius multipliers, tried in order
+MAX_RADIUS_M = 60000        # never search wider than 60 km
+MIN_RESULTS = 3             # never settle for fewer candidates than this
+TAGS_PER_RADIUS = 2         # tags tried per radius when only 1 stop is wanted
+MAX_DISTINCT_TAGS = 4       # never query more than this many tags at once
+MAX_QUERIES = 8             # hard cap on Overpass calls per request
 
 
 def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
@@ -193,13 +199,22 @@ def parse_elements(elements: list, lat: float, lon: float) -> list:
 
 
 def diversify(pool: list, limit: int = 20) -> list:
-    """Pick a fresh, different selection every time: independents first,
-    random within each tier, with a small boost for well-documented places."""
+    """Fresh random selection: independents first, random within each tier,
+    shared fairly between tags, then shuffled."""
     ranked = sorted(
         pool,
         key=lambda p: (p["_tier"], -(random.random() + (0.5 if p["_details"] else 0))),
     )
-    picked = ranked[:limit]
+    by_tag = {}
+    for p in ranked:
+        by_tag.setdefault(p.get("tag"), []).append(p)
+
+    picked = []
+    while len(picked) < limit and any(by_tag.values()):
+        for tag in list(by_tag):
+            if by_tag[tag] and len(picked) < limit:
+                picked.append(by_tag[tag].pop(0))
+
     random.shuffle(picked)  # so list position tells Gemma nothing
     return [{k: v for k, v in p.items() if not k.startswith("_")} for p in picked]
 
@@ -212,12 +227,16 @@ def _search(lat, lon, tags, radius_m):
 _places_cache: dict = {}
 
 def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
-    """A fresh random selection of up to 20 candidate places."""
+    """A fresh random selection of candidates, from a different tag per stop."""
     mood = pick_mood(mood)
-    radius = DURATIONS[duration]["radius_m"]
+    base_radius = DURATIONS[duration]["radius_m"]
+    n_stops = DURATIONS[duration]["stops"]
+    wanted = max(MIN_RESULTS, n_stops * 2)
     all_tags = MOOD_TAGS[mood]
 
-    chosen = random.sample(all_tags, min(TAGS_PER_REQUEST, len(all_tags)))
+    # One tag per stop, up to a cap that keeps Overpass happy
+    n_tags = min(n_stops, len(all_tags), MAX_DISTINCT_TAGS)
+    per_step = max(TAGS_PER_RADIUS, n_tags)
 
     def fetch(tags, rad):
         key = (round(lat, 2), round(lon, 2), tuple(sorted(tags)), rad)
@@ -228,6 +247,37 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
         if pool:  # only cache real answers
             _places_cache[key] = pool
         return pool
+
+    merged, tags_used, radius, queries = {}, [], base_radius, 0
+    for step in RADIUS_STEPS:
+        rad = min(base_radius * step, MAX_RADIUS_M)
+        if step > 1:
+            print(f"  (widening search to {rad} m)")
+        radius = rad
+
+        for tag in random.sample(all_tags, min(per_step, len(all_tags))):
+            if queries >= MAX_QUERIES:
+                break
+            queries += 1
+            label = f"{tag[0]}={tag[1]}"
+            tags_used.append(label)
+            for p in fetch([tag], rad):
+                key = p["name"].lower()
+                if key not in merged or p["distance_m"] < merged[key]["distance_m"]:
+                    merged[key] = {**p, "tag": label}  # copy, so the cache stays clean
+
+        have_tags = len({p["tag"] for p in merged.values()})
+        enough = len(merged) >= wanted
+        # Only widen for tag variety on the first round. After that, enough is enough.
+        if (enough and (have_tags >= n_tags or step > 1)) or queries >= MAX_QUERIES:
+            break
+
+    return {
+        "mood_used": mood,
+        "radius_m": radius,
+        "tags_used": tags_used,
+        "places": diversify(list(merged.values())),
+    }
 
     pool = fetch(chosen, radius)
 

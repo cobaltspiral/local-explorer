@@ -28,7 +28,7 @@ TIME_HINTS = {
 SYSTEM_PROMPT = """You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
 You recommend things using ONLY the numbered lists you are given.
 Rules:
-- Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place or an event.
+- Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place.
 - Choose places that suit the mood, the time of day and the time available. For evening or night, prefer bars, restaurants and lively places. For morning, prefer parks, cafes and markets.
 - Keep "why" to one short sentence and "tip" to one short, practical sentence.
 - Never write IDs like P1 or E2 inside "why" or "tip". Use the place's name instead.
@@ -36,6 +36,7 @@ Rules:
 - In your last message, if you found a spot, don't mention the type (e.g., "I found a cosy place for you", but not "I found these bookshops for you").
 - The user LIVES here and has probably seen the obvious spots, so help them discover somewhere new. Prefer lesser-known, independent, local-feeling places over famous ones, and avoid big chains.
 - The list is in random order. Do not favour the first items, and do not favour the closest. Pick something a little unexpected that still fits the mood.
+- When choosing several stops, try your best to pick different kinds of place rather than several of the same kind.
 - Reply with JSON only, in exactly this shape:
 {"stops": [{"id": "P1", "why": "...", "tip": "..."}]}"""
 
@@ -97,43 +98,66 @@ def clean_text(text: str, names: dict) -> str:
 
 
 def validate(data: dict, places: list, n_stops: int) -> dict:
-    """Turn Gemma's IDs back into REAL data. Anything it invented is dropped."""
+    """Turn Gemma's IDs back into REAL data, with one tag per stop where possible."""
     place_by_id = {f"P{i}": p for i, p in enumerate(places, 1)}
     names = {k: p["name"] for k, p in place_by_id.items()}
 
-    stops, seen = [], set()
+    # 1. Gemma's valid, unique picks, in the order it gave them
+    picks, seen_ids = [], set()
     for s in data.get("stops", []):
         pid = str(s.get("id", "")).strip().upper()
-        if pid in place_by_id and pid not in seen:
-            seen.add(pid)
-            p = place_by_id[pid]
-            stops.append({
-                "name": p["name"],
-                "category": p["category"],
-                "lat": p["lat"],
-                "lon": p["lon"],
-                "distance_m": p["distance_m"],
-                "why": clean_text(str(s.get("why", "")).strip(), names),
-                "tip": clean_text(str(s.get("tip", "")).strip(), names),
-            })
-    stops = stops[:n_stops]
-    if not stops:
+        if pid in place_by_id and pid not in seen_ids:
+            seen_ids.add(pid)
+            picks.append((pid, s))
+    if not picks:
         raise ValueError("Gemma returned no valid stops")
 
+    # 2. Keep one pick per tag; set aside the repeats
+    chosen, used_tags, repeats = [], set(), []
+    for pid, s in picks:
+        tag = place_by_id[pid].get("tag")
+        if tag in used_tags:
+            repeats.append((pid, s))
+        else:
+            chosen.append((pid, s))
+            used_tags.add(tag)
+    chosen_ids = {pid for pid, _ in chosen}
+
+    # 3. Still short? Add places from tags not used yet
     for pid, p in place_by_id.items():
-        if len(stops) >= n_stops:
+        if len(chosen) >= n_stops:
             break
-        if pid in seen:
-            continue
-        seen.add(pid)
+        if pid not in chosen_ids and p.get("tag") not in used_tags:
+            chosen.append((pid, {}))
+            chosen_ids.add(pid)
+            used_tags.add(p.get("tag"))
+
+    # 4. Still short (more stops than tags)? Allow repeats, Gemma's picks first
+    for pid, s in repeats + [(pid, {}) for pid in place_by_id]:
+        if len(chosen) >= n_stops:
+            break
+        if pid not in chosen_ids:
+            chosen.append((pid, s))
+            chosen_ids.add(pid)
+    chosen = chosen[:n_stops]
+
+    stops = []
+    for pid, s in chosen:
+        p = place_by_id[pid]
         stops.append({
-            "name": p["name"], "category": p["category"],
-            "lat": p["lat"], "lon": p["lon"], "distance_m": p["distance_m"],
-            "why": f"A {p['category']} about {p['distance_m']} m away.", "tip": "",
+            "name": p["name"],
+            "category": p["category"],
+            "lat": p["lat"],
+            "lon": p["lon"],
+            "distance_m": p["distance_m"],
+            "why": clean_text(str(s.get("why", "")).strip(), names)
+                   or f"A {p['category']} about {p['distance_m']} m away.",
+            "tip": clean_text(str(s.get("tip", "")).strip(), names),
         })
 
-    message = clean_text(str(data.get("message", "")).strip(), names) or "Hi, I'm Mochi! I found something fun for you."
-    return {"message": message, "stops": stops, "fallback": False}
+    # recommend() overwrites this with make_message(), so this is only a default
+    return {"message": "I found something fun for you!", "stops": stops,
+            "fallback": False}
 
 
 def fallback_result(places: list, n_stops: int) -> dict:
