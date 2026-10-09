@@ -141,7 +141,7 @@ export default function App() {
   async function getRecommendation(finalAnswers) {
     setPhase("loading");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 180000); // 3 minutes
+    const timer = setTimeout(() => controller.abort(), 300000); // 5 minutes
     try {
       const res = await fetch(`${API_URL}/api/recommend`, {
         method: "POST",
