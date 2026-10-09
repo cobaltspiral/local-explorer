@@ -6,31 +6,22 @@ MOOD_TAGS = {
     "cosy": [
         ("amenity", "cafe"), 
         ("cuisine", "ice_cream"), 
-        ("cuisine", "bakery"), 
         ("cuisine", "bubble_tea"),
         ("amenity", "library"),
         ("shop", "bookstore"), 
         ("shop", "bakery"), 
         ("shop", "books"),
-        ("shop", "esoteric")
-
     ],
 
     "outdoors": [
         ("leisure", "park"), 
         ("natural", "water"), 
-        ("natural", "beach"), 
-        ("leisure", "garden"), 
+        ("natural", "beach"),  
         ("natural", "hills"), 
         ("water", "canal"),
         ("water", "river"), 
-        ("water", "stream"), 
         ("water", "lake"), 
-        ("water", "waterfall"),
-        ("leisure", "swimming_pool"), 
         ("leisure", "park"),
-        ("leisure", "beach"),
-
     ],
 
     "adventurous": [
@@ -40,7 +31,6 @@ MOOD_TAGS = {
         ("water", "lake"),
         ("water", "river"),
         ("leisure", "nature_reserve"),
-        ("water", "lake"),
     ],
 
     "creative": [
@@ -48,19 +38,15 @@ MOOD_TAGS = {
         ("amenity", "theatre"),
         ("amenity", "arts_centre"),
         ("amenity", "cinema"),
-        ("amenity", "craft_shop"),
         ("shop", "art"),
         ("shop", "craft"),
         ("amenity", "music_venue"),
         ("amenity", "concert_hall"),
-
     ],
 
     "social": [
         ("amenity", "pub"),
         ("amenity", "bar"),
-        ("leisure", "sauna"), 
-        ("leisure", "social_club"), 
         ("leisure", "axe_throwing"), 
         ("leisure", "escape_game"), 
         ("leisure", "nightclub"), 
@@ -80,7 +66,6 @@ MOOD_TAGS = {
 
     "history": [
         ("tourism", "museum"), 
-        ("building", "castle"), 
         ("historic", "castle"),
         ("historic", "monument"),
         ("historic", "church"),
@@ -115,11 +100,10 @@ MOOD_TAGS = {
         ("shop", "esoteric"), 
         ("shop", "junk_yard"),
         ("amenity", "planetarium"),
-
     ],
 }
 
-# How far to search, and how many stops to recommend, per duration.
+
 DURATIONS = {
     "30min":         {"radius_m": 1500,  "stops": 1},
     "1-2hrs":        {"radius_m": 4000,  "stops": 1},
