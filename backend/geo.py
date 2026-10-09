@@ -249,13 +249,17 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
         return pool
 
     merged, tags_used, radius, queries = {}, [], base_radius, 0
+    tried = set()
     for step in RADIUS_STEPS:
         rad = min(base_radius * step, MAX_RADIUS_M)
         if step > 1:
             print(f"  (widening search to {rad} m)")
         radius = rad
 
-        for tag in random.sample(all_tags, min(per_step, len(all_tags))):
+        untried = [t for t in all_tags if t not in tried]
+        candidates = untried or all_tags  # all tried? then reuse them
+        for tag in random.sample(candidates, min(per_step, len(candidates))):
+            tried.add(tag)
             if queries >= MAX_QUERIES:
                 break
             queries += 1
