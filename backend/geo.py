@@ -16,34 +16,39 @@ HEADERS = {"User-Agent": "local-explorer/0.1 (paola.ruffo@hotmail.com)"}
 
 _last_call = 0.0
 
-def geocode(query: str) -> dict | None:
-    """Turn a place name like 'Lisbon' into coordinates.
+# Kinds of result we accept as "a place you can walk around in"
+SETTLEMENT_TYPES = {"city", "town", "village", "municipality", "suburb", "hamlet", "borough"}
 
-    Returns {"lat": ..., "lon": ..., "display_name": ...}
-    or None if the place wasn't found.
-    """
+
+def geocode(query: str) -> dict | None:
+    """Turn a place name like 'Salerno' into coordinates of the city itself,
+    not the province or region that shares its name."""
     global _last_call
 
-    # Nominatim's rule: max 1 request per second. Wait if needed.
     wait = 1.0 - (time.time() - _last_call)
     if wait > 0:
         time.sleep(wait)
 
-    params = {"q": query, "format": "json", "limit": 1}
+    params = {"q": query, "format": "json", "limit": 8}
     response = httpx.get(NOMINATIM_URL, params=params, headers=HEADERS, timeout=10)
     _last_call = time.time()
 
     response.raise_for_status()
     results = response.json()
-
     if not results:
         return None
 
-    top = results[0]
+    def kind(r):
+        return r.get("addresstype") or r.get("type") or ""
+
+    # Prefer a real settlement, otherwise fall back to the first result
+    best = next((r for r in results if kind(r) in SETTLEMENT_TYPES), results[0])
+    print(f"  (geocoded as: {kind(best)}, {best['display_name']})")
+
     return {
-        "lat": float(top["lat"]), 
-        "lon": float(top["lon"]),
-        "display_name": top["display_name"],
+        "lat": float(best["lat"]),
+        "lon": float(best["lon"]),
+        "display_name": best["display_name"],
     }
 
 PUBLIC_OVERPASS_URLS = [
