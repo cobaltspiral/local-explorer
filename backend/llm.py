@@ -25,7 +25,7 @@ TIME_HINTS = {
     "anytime": "any time of day",
 }
 
-SYSTEM_PROMPT = """You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
+SYSTEM_PROMPT = """<thought off> You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
 You recommend things using ONLY the numbered lists you are given.
 Rules:
 - Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place.
@@ -64,32 +64,89 @@ PLACES:
 
 
 def call_llm(messages: list) -> str:
-    """Calls any OpenAI-compatible endpoint (Ollama locally, something else later)."""
-    # Hosted OpenAI-style endpoint (e.g. Google AI Studio).
-    # Some hosted Gemma models reject a separate system message and JSON mode,
-    # so fold the system prompt into the user message and rely on parse_json().
-    merged = [{
-        "role": "user",
-        "content": messages[0]["content"] + "\n\n" + messages[1]["content"],
-    }]
+    """Calls Gemma. Three routes, chosen by your .env settings."""
+    temperature = 0.6
+
+    # Route 1: Google's native Gemini API (hosted Gemma, thinking set to minimal)
+    if os.getenv("LLM_API_STYLE") == "gemini":
+        model = LLM_MODEL.replace("models/", "")
+        # This route takes one prompt, so the system prompt joins the user message
+        prompt = messages[0]["content"] + "\n\n" + messages[1]["content"]
+        response = httpx.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"x-goog-api-key": LLM_API_KEY},
+            json={
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": 1500,
+                    "thinkingConfig": {"thinkingLevel": "MINIMAL"},
+                },
+            },
+            timeout=LLM_TIMEOUT,
+        )
+        if response.status_code >= 400:
+            # Google's explanation. It never contains your key.
+            print(f"  (Google said: {response.text[:300]})")
+        response.raise_for_status()
+
+        candidates = response.json().get("candidates") or []
+        if not candidates:
+            raise ValueError("Google returned no candidates (the request may have been blocked)")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        # Join the answer text, skipping any parts marked as thoughts
+        return "".join(p.get("text", "") for p in parts if not p.get("thought"))
+
+    # Route 2: Ollama's native API (reliable "no thinking" switch)
+    if (
+        os.getenv("LLM_API_STYLE") == "ollama"
+        or "11434" in LLM_BASE_URL
+        or "ollama" in LLM_BASE_URL.lower()
+    ):
+        base = LLM_BASE_URL.replace("/v1", "").rstrip("/")
+        response = httpx.post(
+            f"{base}/api/chat",
+            json={
+                "model": LLM_MODEL,
+                "messages": messages,
+                "stream": False,
+                "think": False,
+                "format": "json",
+                "options": {"temperature": temperature, "num_predict": 700},
+            },
+            timeout=LLM_TIMEOUT,
+        )
+        response.raise_for_status()
+        return response.json()["message"]["content"]
+
+    # Route 3: any other OpenAI-compatible server
     response = httpx.post(
-        f"{LLM_BASE_URL}/chat/completions",
+        f"{LLM_BASE_URL.rstrip('/')}/chat/completions",
         headers={"Authorization": f"Bearer {LLM_API_KEY}"},
         json={
             "model": LLM_MODEL,
-            "messages": merged,
-            "temperature": 0.4,
-            "max_tokens": 700,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 2000,
         },
         timeout=LLM_TIMEOUT,
     )
+    if response.status_code >= 400:
+        print(f"  (Server said: {response.text[:300]})")
     response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
+    return response.json()["choices"][0]["message"].get("content") or ""
 
 
 def parse_json(text: str) -> dict:
-    """Small models sometimes wrap JSON in ``` fences or add chatter. Cope with it."""
+    """Small models sometimes add reasoning, ``` fences or chatter. Cope with it."""
+    # Remove the model's visible reasoning, if any
+    text = re.sub(r"<thought>.*?</thought>", "", text, flags=re.DOTALL)
+    if "<thought>" in text:
+        raise ValueError("Model ran out of tokens while still thinking")
+
+    # Remove markdown fences
     text = re.sub(r"```(?:json)?", "", text).strip()
+
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
         raise ValueError("No JSON object found in the model's reply")
@@ -222,6 +279,7 @@ def recommend(answers: dict, places: list) -> dict:
     for attempt in (1, 2):
         try:
             raw = call_llm(messages)
+            print("  (debug: raw reply):", repr(raw[:400]))
             result = validate(parse_json(raw), places, n_stops)
             result["message"] = make_message(answers, result["stops"])
             return result
