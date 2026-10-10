@@ -4,7 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // Numbered pixel-style pins. (Leaflet's default image pins often break
-// when bundled with Vite, and these fit the theme better anyway.)
+// when bundled with Vite, plus these fit the pixel theme better.)
 function numberIcon(n) {
   return L.divIcon({
     className: "pin",

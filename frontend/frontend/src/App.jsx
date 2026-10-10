@@ -5,7 +5,6 @@ import ResultMap from "./ResultMap";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-// "value" must match exactly what the backend accepts.
 const MOODS = [
   { label: "Cosy", value: "cosy" },
   { label: "Outdoors", value: "outdoors" },
@@ -18,6 +17,7 @@ const MOODS = [
   { label: "Unusual", value: "unusual" },
   { label: "Surprise me", value: "surprise" },
 ];
+
 const DURATIONS = [
   { label: "30 min", value: "30min" },
   { label: "1-2 hrs", value: "1-2hrs" },
@@ -25,6 +25,7 @@ const DURATIONS = [
   { label: "Full day", value: "full_day" },
   { label: "Multiple days", value: "multiple_days" },
 ];
+
 const TIMES = [
   { label: "Morning", value: "morning" },
   { label: "Afternoon", value: "afternoon" },
@@ -98,13 +99,13 @@ export default function App() {
     duration: "",
     time_of_day: "",
   });
-  const [phase, setPhase] = useState("asking"); // asking | loading | result | error
+  const [phase, setPhase] = useState("asking");
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [loadIdx, setLoadIdx] = useState(0);
   const [mouthOpen, setMouthOpen] = useState(false);
 
-  // What is Mochi saying right now?
+  
   let speech = "";
   if (phase === "asking") speech = QUESTIONS[step].text;
   else if (phase === "loading") speech = LOADING_MSGS[loadIdx];
