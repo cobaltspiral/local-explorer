@@ -25,7 +25,7 @@ TIME_HINTS = {
     "anytime": "any time of day",
 }
 
-SYSTEM_PROMPT = """<thought off> You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
+SYSTEM_PROMPT = """You are Mochi, a cheerful pixel-art travel guide who loves getting people outside.
 You recommend things using ONLY the numbered lists you are given.
 Rules:
 - Refer to places ONLY by their ID (like P3 or E2). Never invent an ID or a place.
@@ -86,7 +86,6 @@ def call_llm(messages: list) -> str:
             timeout=LLM_TIMEOUT,
         )
         if response.status_code >= 400:
-            # Google's explanation. It never contains your key.
             print(f"  (Google said: {response.text[:300]})")
         response.raise_for_status()
 
@@ -97,7 +96,7 @@ def call_llm(messages: list) -> str:
         # Join the answer text, skipping any parts marked as thoughts
         return "".join(p.get("text", "") for p in parts if not p.get("thought"))
 
-    # Route 2: Ollama's native API (reliable "no thinking" switch)
+    # Route 2: Ollama's native API with "no thinking" switch on.
     if (
         os.getenv("LLM_API_STYLE") == "ollama"
         or "11434" in LLM_BASE_URL
@@ -174,7 +173,7 @@ def validate(data: dict, places: list, n_stops: int) -> dict:
     if not picks:
         raise ValueError("Gemma returned no valid stops")
 
-    # 2. Keep one pick per tag; set aside the repeats
+    # 2. Keep one pick per tag, set aside the repeats.
     chosen, used_tags, repeats = [], set(), []
     for pid, s in picks:
         tag = place_by_id[pid].get("tag")

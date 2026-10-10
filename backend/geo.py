@@ -16,7 +16,7 @@ HEADERS = {"User-Agent": "local-explorer/0.1 (paola.ruffo@hotmail.com)"}
 
 _last_call = 0.0
 
-# Kinds of result we accept as "a place you can walk around in"
+# Kinds of places accepted as "a place you can walk around in" (e.g. the city, not the province of the same name)
 SETTLEMENT_TYPES = {"city", "town", "village", "municipality", "suburb", "hamlet", "borough"}
 
 
@@ -57,19 +57,15 @@ PUBLIC_OVERPASS_URLS = [
     "https://overpass.private.coffee/api/interpreter",
 ]
 
-# Your private endpoint goes first if it's set in .env
 PRIVATE_OVERPASS = os.getenv("OVERPASS_PRIVATE_URL")
 OVERPASS_URLS = ([PRIVATE_OVERPASS] if PRIVATE_OVERPASS else []) + PUBLIC_OVERPASS_URLS
 
-# Used to label each place (e.g. "cafe", "park").
 CATEGORY_KEYS = ["amenity", "leisure", "tourism", "historic",
                  "shop", "natural", "man_made", "sport", "waterway"]
 
-# A place with any of these tags is probably real and still operating
 DETAIL_KEYS = ["opening_hours", "website", "phone", "description"]
 
 # Backup chain list, for chains nobody tagged with a "brand" in OpenStreetMap.
-# Add the chains you keep seeing in your city.
 CHAIN_NAMES = {
     "starbucks", "costa", "costa coffee", "caffè nero", "caffe nero",
     "pret a manger", "greggs", "mcdonald's", "burger king", "kfc", "subway",
@@ -86,12 +82,12 @@ def is_chain_name(name: str) -> bool:
 
 PER_TAG_LIMIT = 50
 TAGS_PER_REQUEST = 1 
-RADIUS_STEPS = [1, 2, 4]    # radius multipliers, tried in order
-MAX_RADIUS_M = 60000        # never search wider than 60 km
-MIN_RESULTS = 3             # never settle for fewer candidates than this
-TAGS_PER_RADIUS = 2         # tags tried per radius when only 1 stop is wanted
-MAX_DISTINCT_TAGS = 4       # never query more than this many tags at once
-MAX_QUERIES = 8             # hard cap on Overpass calls per request
+RADIUS_STEPS = [1, 2, 4]    
+MAX_RADIUS_M = 60000        
+MIN_RESULTS = 3         
+TAGS_PER_RADIUS = 2        
+MAX_DISTINCT_TAGS = 4       
+MAX_QUERIES = 8            
 
 
 def build_query(lat: float, lon: float, tags: list, radius_m: int) -> str:
@@ -231,6 +227,7 @@ def _search(lat, lon, tags, radius_m):
 
 _places_cache: dict = {}
 
+
 def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
     """A fresh random selection of candidates, from a different tag per stop."""
     mood = pick_mood(mood)
@@ -277,7 +274,7 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
 
         have_tags = len({p["tag"] for p in merged.values()})
         enough = len(merged) >= wanted
-        # Only widen for tag variety on the first round. After that, enough is enough.
+        # Only widen for tag variety on the first round.
         if (enough and (have_tags >= n_tags or step > 1)) or queries >= MAX_QUERIES:
             break
 
@@ -290,7 +287,7 @@ def find_places(lat: float, lon: float, mood: str, duration: str) -> dict:
 
     pool = fetch(chosen, radius)
 
-    # Too few results? Widen the radius and try a different tag (still just one).
+    # Widen the radius and try a different tag if too few results.
     if len(pool) < 3:
         radius *= 2
         others = [t for t in all_tags if t not in chosen] or all_tags

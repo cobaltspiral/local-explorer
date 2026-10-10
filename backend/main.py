@@ -10,8 +10,6 @@ from llm import recommend
 
 app = FastAPI(title="Mochi the Explorer API")
 
-# CORS: lets your React app (a different address) call this API.
-# On Render you'll add your frontend's URL to ALLOWED_ORIGINS.
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -35,8 +33,6 @@ def health():
     return {"status": "ok"}
 
 
-# Plain `def` (not async) on purpose: our libraries block while waiting,
-# and FastAPI runs plain functions in a thread so the server stays responsive.
 @app.post("/api/recommend")
 def api_recommend(body: Answers):
     # 1. Where is the user?
@@ -55,7 +51,7 @@ def api_recommend(body: Answers):
 
     mood_used = found["mood_used"]  # resolves "surprise" to a real mood
 
-    # 4. Gemma writes the recommendation (never raises either)
+    # 4. Gemma writes the recommendation
     answers = {
         "location": body.location,
         "mood": mood_used,
