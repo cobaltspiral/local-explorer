@@ -65,16 +65,21 @@ PLACES:
 
 def call_llm(messages: list) -> str:
     """Calls any OpenAI-compatible endpoint (Ollama locally, something else later)."""
+    # Hosted OpenAI-style endpoint (e.g. Google AI Studio).
+    # Some hosted Gemma models reject a separate system message and JSON mode,
+    # so fold the system prompt into the user message and rely on parse_json().
+    merged = [{
+        "role": "user",
+        "content": messages[0]["content"] + "\n\n" + messages[1]["content"],
+    }]
     response = httpx.post(
         f"{LLM_BASE_URL}/chat/completions",
         headers={"Authorization": f"Bearer {LLM_API_KEY}"},
         json={
             "model": LLM_MODEL,
-            "messages": messages,
-            "temperature": 0.6,
+            "messages": merged,
+            "temperature": 0.4,
             "max_tokens": 700,
-            "response_format": {"type": "json_object"},
-            "reasoning_effort": "none",
         },
         timeout=LLM_TIMEOUT,
     )
