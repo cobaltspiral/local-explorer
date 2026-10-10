@@ -270,7 +270,6 @@ def make_message(answers: dict, stops: list) -> str:
 def recommend(answers: dict, places: list) -> dict:
     """Main function: always returns a result, never crashes."""
     n_stops = DURATIONS[answers["duration"]]["stops"]
-    print(f"  (debug: {len(places)} places available, {n_stops} stops wanted)")
     if not places:
         return {"message": "Hmm, I couldn't find anything nearby. Try another mood or a bigger area!",
                 "stops": [], "fallback": True}
@@ -279,7 +278,6 @@ def recommend(answers: dict, places: list) -> dict:
     for attempt in (1, 2):
         try:
             raw = call_llm(messages)
-            print("  (debug: raw reply):", repr(raw[:400]))
             result = validate(parse_json(raw), places, n_stops)
             result["message"] = make_message(answers, result["stops"])
             return result
